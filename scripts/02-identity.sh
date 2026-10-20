@@ -48,7 +48,8 @@ cert="$(secret_pem "${NS}" payments-api default)"
 openssl x509 -noout -subject -issuer -dates -ext subjectAltName <<< "${cert}" | sed 's/^/    /'
 expect_eq "SAN URI of payments-api" "URI:spiffe://cluster.local/ns/payments/sa/payments-api" \
   "$(openssl x509 -noout -ext subjectAltName <<< "${cert}" | sed -n 's/^ *//; /^URI:/p')"
-expect_eq "issued by the mesh CA (O=cluster.local)" "issuer=O=cluster.local" "$(openssl x509 -noout -issuer <<< "${cert}")"
+# LibreSSL (macOS) prints "issuer=O=cluster.local", OpenSSL 3 "issuer=O = cluster.local".
+expect_eq "issued by the mesh CA (O=cluster.local)" "issuer=O=cluster.local" "$(openssl x509 -noout -issuer <<< "${cert}" | tr -d ' ')"
 for w in fraud-check risk-score; do
   expect_eq "SAN URI of ${w}: its own ServiceAccount" "URI:spiffe://cluster.local/ns/payments/sa/${w}" \
     "$(secret_pem "${NS}" "${w}" default | openssl x509 -noout -ext subjectAltName | sed -n 's/^ *//; /^URI:/p')"
