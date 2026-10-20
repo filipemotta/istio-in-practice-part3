@@ -1,0 +1,21 @@
+# validate.sh on every push and pull request; the whole lab in a kind cluster
+# on pushes to main, on manual runs and every Monday, so a new release of a
+# dependency that breaks the lab shows up here before a reader finds it.
+name: lab
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  lab:
+    # filipemotta/companion-ci, pinned to a commit SHA
+    uses: filipemotta/companion-ci/.github/workflows/companion.yml@201961269eb0d576dc51b5632cee39945b745854
+    with:
+      lab: bash scripts/test-all.sh
