@@ -1,0 +1,60 @@
+# Prometheus alerting rules for the security posture of the mesh. Plain
+# Prometheus rule file format (no operator): scripts/01-cluster.sh loads it
+# into the samples/addons Prometheus as the "alerting_rules.yml" key of the
+# "prometheus" ConfigMap. Unit tests: observability/alerts_test.yaml.
+#
+# Notes that shaped the expressions:
+# - connection_security_policy is only meaningful where the destination
+#   proxy reports (reporter="destination"): "mutual_tls" or "none". The
+#   source side always reports "unknown".
+# - Plain text into an ambient pod without a waypoint never shows here:
+#   ztunnel exports TCP metrics, not istio_requests_total.
+# - envoy_http_rbac is the Envoy RBAC filter counter of each sidecar, with
+#   the pod labels "namespace" and "app" added by the addon's scrape config.
+#   authz_enforce_result="denied" counts requests refused by an
+#   AuthorizationPolicy (403 "RBAC: access denied"); authz_dry_run_result
+#   counts what a policy annotated istio.io/dry-run="true" would have done.
+groups:
+- name: istio-security
+  rules:
+  # Plain text still reaching a sidecar: a caller outside the mesh (or one
+  # that lost its sidecar) in a namespace that is not STRICT yet. It names
+  # the caller's workload; the caller has no principal.
+  - alert: IstioPlaintextInbound
+    expr: |
+      sum by (destination_workload_namespace, destination_workload, source_workload_namespace, source_workload) (
+        rate(istio_requests_total{reporter="destination", connection_security_policy="none"}[5m])
+      ) > 0
+    for: 5m
+    labels:
+      severity: warning
+    annotations:
+      summary: "Plain-text requests from {{ $labels.source_workload_namespace }}/{{ $labels.source_workload }} to {{ $labels.destination_workload_namespace }}/{{ $labels.destination_workload }}"
+      description: '{{ printf "%.2f" $value }} req/s arrive without mTLS: the caller has no identity, so no principal-based policy can apply to it. Migrate the caller before switching the namespace to STRICT.'
+  # A workload keeps refusing requests: a caller that was never allowed, a
+  # migration that missed a path, or someone probing. Short bursts are
+  # normal under deny-by-default; a sustained rate is not.
+  - alert: IstioAuthorizationDenied
+    expr: |
+      sum by (namespace, app) (
+        rate(envoy_http_rbac{authz_enforce_result="denied"}[5m])
+      ) > 0
+    for: 10m
+    labels:
+      severity: warning
+    annotations:
+      summary: "{{ $labels.namespace }}/{{ $labels.app }} is denying requests (RBAC: access denied)"
+      description: '{{ printf "%.2f" $value }} req/s refused by an AuthorizationPolicy for 10 minutes. The proxy access log has the matched policy in %RESPONSE_CODE_DETAILS% (rbac_access_denied_matched_policy[...]).'
+  # A dry-run policy would refuse real traffic: read this before removing
+  # the istio.io/dry-run annotation.
+  - alert: IstioAuthzDryRunWouldDeny
+    expr: |
+      sum by (namespace, app) (
+        rate(envoy_http_rbac{authz_dry_run_result="denied"}[5m])
+      ) > 0
+    for: 5m
+    labels:
+      severity: info
+    annotations:
+      summary: "A dry-run AuthorizationPolicy on {{ $labels.namespace }}/{{ $labels.app }} would deny traffic"
+      description: '{{ printf "%.2f" $value }} req/s would be refused if the policy were enforced. The proxy rbac debug log names it: "shadow denied, matched policy ns[...]-policy[...]-rule[...]".'

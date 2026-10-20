@@ -1,0 +1,17 @@
+# authz/20-fraud-check-deny-export.yaml without its port: a DENY rule with
+# only HTTP attributes. istiod accepts it with a warning on apply ("will deny
+# all traffic to TCP ports under its scope"), which a GitOps sync never shows.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: fraud-check-deny-export
+  namespace: payments
+spec:
+  selector:
+    matchLabels:
+      app: fraud-check
+  action: DENY
+  rules:
+  - to:
+    - operation:
+        paths: ["/v1/check/export", "/v1/check/export/*"]

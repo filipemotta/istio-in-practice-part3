@@ -1,0 +1,13 @@
+# The real "deny everything": action DENY with one empty rule, which matches
+# every request. DENY is evaluated before ALLOW, so this refuses even what
+# the ALLOW policies name. A break-glass switch, not the way to start
+# deny-by-default (that is authz/00-allow-nothing.yaml).
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: deny-all
+  namespace: payments
+spec:
+  action: DENY
+  rules:
+  - {}

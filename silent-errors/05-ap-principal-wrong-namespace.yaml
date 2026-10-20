@@ -1,0 +1,18 @@
+# Meant as "allow payments-api to call risk-score". The service account is
+# right, the namespace is not: payments-api runs in "payments", not in
+# "payment". Nothing validates that the identity exists, so the policy is
+# accepted and never matches.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: risk-score-allow-payments-api
+  namespace: payments
+spec:
+  selector:
+    matchLabels:
+      app: risk-score
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/payment/sa/payments-api"]

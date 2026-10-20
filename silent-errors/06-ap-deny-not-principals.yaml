@@ -1,0 +1,19 @@
+# Meant as "deny the legacy caller". notPrincipals in a DENY rule matches
+# every request whose principal is NOT in the list: this denies every caller
+# except payments-api, including fraud-check and the ingress gateway, and a
+# plain-text caller (no principal at all) is denied too.
+# The intent is written with principals (or namespaces) in the DENY rule.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: deny-legacy
+  namespace: payments
+spec:
+  selector:
+    matchLabels:
+      app: risk-score
+  action: DENY
+  rules:
+  - from:
+    - source:
+        notPrincipals: ["cluster.local/ns/payments/sa/payments-api"]

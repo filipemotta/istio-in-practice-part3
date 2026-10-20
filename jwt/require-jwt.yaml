@@ -1,0 +1,20 @@
+# Requests through the Gateway must carry a valid token from the payments
+# issuer. requestPrincipals is "<iss>/<sub>"; "<iss>/*" accepts any subject
+# of that issuer, and only requests that passed RequestAuthentication have a
+# request principal at all, so a request without a token matches nothing and
+# is denied (this is an ALLOW policy: anything it does not match is denied).
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: require-jwt
+  namespace: payments-ingress
+spec:
+  targetRefs:
+  - kind: Gateway
+    group: gateway.networking.k8s.io
+    name: payments-gateway
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        requestPrincipals: ["https://issuer.payments.example/*"]

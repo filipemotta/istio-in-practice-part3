@@ -1,0 +1,14 @@
+# Meant as "deny everything in payments". It is an ALLOW policy (the default
+# action) with one empty rule, and an empty rule matches every request: this
+# allows everything, and since any matching ALLOW policy allows the request,
+# it also opens every path the other policies left closed.
+# The deny-by-default policy is "spec: {}" (authz/00-allow-nothing.yaml); an
+# emergency deny-all is action DENY with "rules: [{}]".
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: deny-all
+  namespace: payments
+spec:
+  rules:
+  - {}

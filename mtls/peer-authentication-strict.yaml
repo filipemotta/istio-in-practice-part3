@@ -1,0 +1,13 @@
+# Namespace-wide STRICT mTLS for payments: the sidecars of every workload in
+# the namespace accept only mutual TLS. The name "default" is a convention
+# for the namespace-wide policy (no selector); one per namespace.
+# Apply only after the inventory shows no plain-text caller left
+# (mtls/plaintext-inventory.sh), or after deciding to cut the ones it shows.
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: payments
+spec:
+  mtls:
+    mode: STRICT

@@ -1,0 +1,10 @@
+# payments-ambient as scripts/07-ambient.sh leaves it: ambient data plane and
+# the namespace waypoint in the path (istio.io/use-waypoint). Lint fixture for
+# the ztunnel policies that only make sense with or without a waypoint.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: payments-ambient
+  labels:
+    istio.io/dataplane-mode: ambient
+    istio.io/use-waypoint: waypoint

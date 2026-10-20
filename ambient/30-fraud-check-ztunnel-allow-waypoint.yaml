@@ -1,0 +1,19 @@
+# With a waypoint in the path, the ztunnel of fraud-check sees connections
+# from the waypoint's identity, not from the original caller (waypoints do
+# not impersonate the source). An L4 policy that names payments-api would now
+# deny everything. This one replaces it: fraud-check's ztunnel accepts only
+# the waypoint, so traffic cannot skip the waypoint and its L7 policy.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: fraud-check-l4-allow
+  namespace: payments-ambient
+spec:
+  selector:
+    matchLabels:
+      app: fraud-check
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/payments-ambient/sa/waypoint"]

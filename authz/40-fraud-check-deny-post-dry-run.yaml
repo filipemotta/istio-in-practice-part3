@@ -1,0 +1,23 @@
+# A policy under test: deny POST /v1/check on fraud-check. With the
+# istio.io/dry-run annotation the proxy evaluates the policy and records what
+# it would have done (an Envoy RBAC "shadow" result in stats, debug log and
+# trace tags) without enforcing it. Dry-run supports ALLOW and DENY only.
+# Remove the annotation, or set it to "false", to enforce.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: fraud-check-deny-post
+  namespace: payments
+  annotations:
+    istio.io/dry-run: "true"
+spec:
+  selector:
+    matchLabels:
+      app: fraud-check
+  action: DENY
+  rules:
+  - to:
+    - operation:
+        ports: ["8080"]
+        methods: ["POST"]
+        paths: ["/v1/check"]

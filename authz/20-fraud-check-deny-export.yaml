@@ -1,0 +1,22 @@
+# An explicit DENY: nobody calls the bulk export endpoint of fraud-check
+# from inside the mesh, whatever the ALLOW policies say. DENY policies are
+# evaluated before ALLOW policies, so this wins over fraud-check-allow even
+# though /v1/check/export matches "/v1/check/*" there.
+# The port is explicit: paths are HTTP attributes, and a DENY rule with only
+# HTTP attributes also denies all TCP traffic in its scope (istiod warns on
+# apply when the port is missing).
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: fraud-check-deny-export
+  namespace: payments
+spec:
+  selector:
+    matchLabels:
+      app: fraud-check
+  action: DENY
+  rules:
+  - to:
+    - operation:
+        ports: ["8080"]
+        paths: ["/v1/check/export", "/v1/check/export/*"]

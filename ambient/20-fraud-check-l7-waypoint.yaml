@@ -1,0 +1,23 @@
+# The same L7 rule, attached to the fraud-check Service with targetRefs: the
+# waypoint that serves fraud-check enforces it (the namespace must use the
+# waypoint, istio.io/use-waypoint=waypoint). Waypoints ignore selector
+# policies; targetRefs is the only way to give them one.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: fraud-check-l7
+  namespace: payments-ambient
+spec:
+  targetRefs:
+  - kind: Service
+    group: ""
+    name: fraud-check
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/payments-ambient/sa/payments-api"]
+    to:
+    - operation:
+        methods: ["GET"]
+        paths: ["/v1/check", "/v1/check/*"]

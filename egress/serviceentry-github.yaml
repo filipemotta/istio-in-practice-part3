@@ -1,0 +1,24 @@
+# api.github.com, the integration registered in Part 2, now with two ports.
+# Port 80 is declared as HTTP but sends to port 443 of the real host
+# (targetPort): the application keeps calling http://api.github.com, and the
+# sidecar opens the TLS connection itself (egress/destinationrule-github-tls.yaml).
+# Port 443 stays for clients that already speak HTTPS.
+# Pattern of the Istio 1.31 task "Egress TLS Origination".
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: api-github-com
+  namespace: payments
+spec:
+  hosts:
+  - api.github.com
+  location: MESH_EXTERNAL
+  ports:
+  - number: 80
+    name: http-port
+    protocol: HTTP
+    targetPort: 443
+  - number: 443
+    name: https-port
+    protocol: HTTPS
+  resolution: DNS

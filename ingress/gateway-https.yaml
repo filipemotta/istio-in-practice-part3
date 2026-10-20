@@ -1,0 +1,42 @@
+# The same Gateway with an HTTPS listener added: TLS terminates at the
+# gateway with the certificate in the Secret payments-gateway-cert (type
+# kubernetes.io/tls, same namespace, created by scripts/06-tls-edges.sh from
+# tools/gen-tls-cert.sh). The HTTPRoute of ingress/httproute.yaml has no
+# sectionName, so it serves both listeners.
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: payments-gateway
+  namespace: payments-ingress
+spec:
+  gatewayClassName: istio
+  infrastructure:
+    parametersRef:
+      group: ""
+      kind: ConfigMap
+      name: payments-gateway-options
+  listeners:
+  - name: http
+    hostname: api.payments.example
+    port: 80
+    protocol: HTTP
+    allowedRoutes:
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            kubernetes.io/metadata.name: payments
+  - name: https
+    hostname: api.payments.example
+    port: 443
+    protocol: HTTPS
+    tls:
+      mode: Terminate
+      certificateRefs:
+      - name: payments-gateway-cert
+    allowedRoutes:
+      namespaces:
+        from: Selector
+        selector:
+          matchLabels:
+            kubernetes.io/metadata.name: payments

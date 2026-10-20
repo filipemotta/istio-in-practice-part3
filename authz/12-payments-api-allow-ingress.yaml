@@ -1,0 +1,21 @@
+# payments-api accepts requests from the ingress gateway only, on its public
+# API. The gateway calls payments-api with its own identity, not the end
+# user's: the end user is checked at the gateway (jwt/).
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: payments-api-allow-ingress
+  namespace: payments
+spec:
+  selector:
+    matchLabels:
+      app: payments-api
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/payments-ingress/sa/payments-gateway-istio"]
+    to:
+    - operation:
+        methods: ["GET", "POST"]
+        paths: ["/v1/payments", "/v1/payments/*"]

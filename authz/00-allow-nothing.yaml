@@ -1,0 +1,11 @@
+# Deny by default for the whole payments namespace. No selector: it applies
+# to every workload in the namespace. No rules: an ALLOW policy whose rules
+# never match. Once a workload has at least one ALLOW policy, a request is
+# allowed only if some ALLOW policy matches it, so with this one alone
+# nothing is allowed. Every path that must work is then opened by name.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-nothing
+  namespace: payments
+spec: {}

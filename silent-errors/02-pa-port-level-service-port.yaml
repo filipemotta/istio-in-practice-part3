@@ -1,0 +1,18 @@
+# Meant as: "keep plain text open on payments-api's port 8080 for the legacy
+# caller". 8080 is the Service port; the container listens on 9080, and
+# portLevelMtls matches the workload port. The exception never applies:
+# legacy callers are still reset.
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: payments-api-legacy-port
+  namespace: payments
+spec:
+  selector:
+    matchLabels:
+      app: payments-api
+  mtls:
+    mode: STRICT
+  portLevelMtls:
+    8080:
+      mode: PERMISSIVE

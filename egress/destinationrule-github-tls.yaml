@@ -1,0 +1,18 @@
+# TLS origination: requests the sidecar receives as plain HTTP for
+# api.github.com:80 leave it as TLS. mode SIMPLE is one-way TLS: the sidecar
+# verifies the server certificate against the OS CA bundle (caCertificates
+# omitted, insecureSkipVerify defaults to false) and, with sni unset, sends
+# the Host header (api.github.com) as SNI.
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: api-github-com
+  namespace: payments
+spec:
+  host: api.github.com
+  trafficPolicy:
+    portLevelSettings:
+    - port:
+        number: 80
+      tls:
+        mode: SIMPLE

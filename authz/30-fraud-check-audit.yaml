@@ -1,0 +1,18 @@
+# AUDIT marks matching requests for auditing; it never changes whether a
+# request is allowed or denied. Istio only marks the request: an audit
+# plugin must be configured to act on the mark, and the default installation
+# has none.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: fraud-check-audit-writes
+  namespace: payments
+spec:
+  selector:
+    matchLabels:
+      app: fraud-check
+  action: AUDIT
+  rules:
+  - to:
+    - operation:
+        methods: ["POST"]

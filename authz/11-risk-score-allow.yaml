@@ -1,0 +1,20 @@
+# risk-score accepts only fraud-check, only GET /v1/score*. payments-api
+# calling risk-score directly is not on the list, so it is denied.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: risk-score-allow
+  namespace: payments
+spec:
+  selector:
+    matchLabels:
+      app: risk-score
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/payments/sa/fraud-check"]
+    to:
+    - operation:
+        methods: ["GET"]
+        paths: ["/v1/score", "/v1/score/*"]

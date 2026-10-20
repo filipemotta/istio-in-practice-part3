@@ -1,0 +1,15 @@
+# Invalid on purpose: portLevelMtls only applies to a workload selector, and
+# the CRD validation of Istio 1.31 rejects it without one
+# ("portLevelMtls requires selector"). Used by scripts/03-mtls.sh
+# (kubectl apply --dry-run=server) and ci/test-security-lint.sh.
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: payments
+spec:
+  mtls:
+    mode: STRICT
+  portLevelMtls:
+    8090:
+      mode: PERMISSIVE

@@ -1,0 +1,24 @@
+# Meant as "payments-api may only GET /v1/check on fraud-check" in an ambient
+# namespace. With a workload selector the policy is enforced by ztunnel, and
+# ztunnel cannot see methods or paths: a policy with L7 attributes enforced
+# by ztunnel fails safe by becoming a DENY policy. The allowed caller is cut
+# off too (its connections are reset). L7 rules belong on the waypoint, with
+# targetRefs (ambient/20-fraud-check-l7-waypoint.yaml).
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: fraud-check-l7-on-ztunnel
+  namespace: payments-ambient
+spec:
+  selector:
+    matchLabels:
+      app: fraud-check
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/payments-ambient/sa/payments-api"]
+    to:
+    - operation:
+        methods: ["GET"]
+        paths: ["/v1/check", "/v1/check/*"]

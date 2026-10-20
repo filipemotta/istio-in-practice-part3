@@ -1,0 +1,20 @@
+# Used by step 04 to test GHSA-w44g-8m76-8gc5 ("AuthorizationPolicy method
+# rules are bypassed over HTTP/2 by changing the case of the method", fixed
+# in Istio 1.31.2). By default the hop between two sidecars for this "http"
+# port is HTTP/1.1, so a lowercase method sent by the client over HTTP/2 is
+# re-encoded as HTTP/1.1 and refused by fraud-check's HTTP/1 codec (400)
+# before any authorization runs. With useClientProtocol the caller's sidecar
+# keeps the client's protocol upstream: an HTTP/2 client reaches
+# fraud-check's sidecar over HTTP/2, the case where the DENY method rule of
+# authz/40 must still match "post".
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: fraud-check-keep-client-protocol
+  namespace: payments
+spec:
+  host: fraud-check.payments.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      http:
+        useClientProtocol: true

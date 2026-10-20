@@ -1,0 +1,111 @@
+# Unit tests for observability/alerts.yaml.
+# Run: promtool test rules observability/alerts_test.yaml
+# (ci/test-alerts.sh runs it with the promtool pinned by tools/install-cli.sh)
+# Counters are sampled every minute; "0+6x20" is 6 requests per minute (0.1/s).
+rule_files:
+- alerts.yaml
+evaluation_interval: 1m
+
+tests:
+# Plain text: a sustained stream is pending first, firing after "for: 5m".
+- name: plain text, sustained
+  interval: 1m
+  input_series:
+  - series: 'istio_requests_total{reporter="destination", connection_security_policy="none", source_workload_namespace="legacy", source_workload="settlement-batch", destination_workload_namespace="payments", destination_workload="fraud-check", response_code="200"}'
+    values: '0+6x20'
+  alert_rule_test:
+  - eval_time: 4m
+    alertname: IstioPlaintextInbound
+    exp_alerts: []
+  - eval_time: 7m
+    alertname: IstioPlaintextInbound
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        source_workload_namespace: legacy
+        source_workload: settlement-batch
+        destination_workload_namespace: payments
+        destination_workload: fraud-check
+      exp_annotations:
+        summary: "Plain-text requests from legacy/settlement-batch to payments/fraud-check"
+        description: "0.10 req/s arrive without mTLS: the caller has no identity, so no principal-based policy can apply to it. Migrate the caller before switching the namespace to STRICT."
+
+# mTLS traffic, and the "unknown" the source side reports, never fire.
+- name: mutual TLS and source-side series
+  interval: 1m
+  input_series:
+  - series: 'istio_requests_total{reporter="destination", connection_security_policy="mutual_tls", source_workload_namespace="payments", source_workload="payments-api", destination_workload_namespace="payments", destination_workload="fraud-check", response_code="200"}'
+    values: '0+60x20'
+  - series: 'istio_requests_total{reporter="source", connection_security_policy="unknown", source_workload_namespace="payments", source_workload="payments-api", destination_workload_namespace="payments", destination_workload="fraud-check", response_code="200"}'
+    values: '0+60x20'
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: IstioPlaintextInbound
+    exp_alerts: []
+
+# One stray plain-text request leaves the 5m window before "for" elapses.
+- name: plain text, single request
+  interval: 1m
+  input_series:
+  - series: 'istio_requests_total{reporter="destination", connection_security_policy="none", source_workload_namespace="legacy", source_workload="settlement-batch", destination_workload_namespace="payments", destination_workload="fraud-check", response_code="200"}'
+    values: '0 1x20'
+  alert_rule_test:
+  - eval_time: 12m
+    alertname: IstioPlaintextInbound
+    exp_alerts: []
+
+# RBAC denials: firing only after 10 minutes of sustained refusals.
+- name: authorization denied, sustained
+  interval: 1m
+  input_series:
+  - series: 'envoy_http_rbac{namespace="payments", app="fraud-check", pod="fraud-check-1", http_conn_manager_prefix="inbound_0.0.0.0_8080", authz_enforce_result="denied"}'
+    values: '0+12x20'
+  - series: 'envoy_http_rbac{namespace="payments", app="fraud-check", pod="fraud-check-1", http_conn_manager_prefix="inbound_0.0.0.0_8080", authz_enforce_result="allowed"}'
+    values: '0+600x20'
+  alert_rule_test:
+  - eval_time: 8m
+    alertname: IstioAuthorizationDenied
+    exp_alerts: []
+  - eval_time: 12m
+    alertname: IstioAuthorizationDenied
+    exp_alerts:
+    - exp_labels:
+        severity: warning
+        namespace: payments
+        app: fraud-check
+      exp_annotations:
+        summary: "payments/fraud-check is denying requests (RBAC: access denied)"
+        description: "0.20 req/s refused by an AuthorizationPolicy for 10 minutes. The proxy access log has the matched policy in %RESPONSE_CODE_DETAILS% (rbac_access_denied_matched_policy[...])."
+
+# Allowed requests alone never fire the denial alert.
+- name: authorization allowed only
+  interval: 1m
+  input_series:
+  - series: 'envoy_http_rbac{namespace="payments", app="fraud-check", pod="fraud-check-1", http_conn_manager_prefix="inbound_0.0.0.0_8080", authz_enforce_result="allowed"}'
+    values: '0+600x20'
+  - series: 'envoy_http_rbac{namespace="payments", app="fraud-check", pod="fraud-check-1", http_conn_manager_prefix="inbound_0.0.0.0_8080", authz_enforce_result="denied"}'
+    values: '0x20'
+  alert_rule_test:
+  - eval_time: 15m
+    alertname: IstioAuthorizationDenied
+    exp_alerts: []
+
+# Dry run: a shadow denial fires; a shadow "allowed" does not.
+- name: dry run would deny
+  interval: 1m
+  input_series:
+  - series: 'envoy_http_rbac{namespace="payments", app="fraud-check", pod="fraud-check-1", http_conn_manager_prefix="inbound_0.0.0.0_8080", authz_dry_run_action="deny", authz_dry_run_result="denied"}'
+    values: '0+6x20'
+  - series: 'envoy_http_rbac{namespace="payments", app="risk-score", pod="risk-score-1", http_conn_manager_prefix="inbound_0.0.0.0_8080", authz_dry_run_action="deny", authz_dry_run_result="allowed"}'
+    values: '0+60x20'
+  alert_rule_test:
+  - eval_time: 7m
+    alertname: IstioAuthzDryRunWouldDeny
+    exp_alerts:
+    - exp_labels:
+        severity: info
+        namespace: payments
+        app: fraud-check
+      exp_annotations:
+        summary: "A dry-run AuthorizationPolicy on payments/fraud-check would deny traffic"
+        description: '0.10 req/s would be refused if the policy were enforced. The proxy rbac debug log names it: "shadow denied, matched policy ns[...]-policy[...]-rule[...]".'

@@ -1,0 +1,39 @@
+# A namespace that never joined the mesh: no istio-injection label, no
+# ambient label. settlement-batch plays an old nightly job that still calls
+# fraud-check directly. It has no sidecar and no certificate, so whatever it
+# sends is plain text and carries no identity.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: legacy
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: settlement-batch
+  namespace: legacy
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: settlement-batch
+  namespace: legacy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: settlement-batch
+  template:
+    metadata:
+      labels:
+        app: settlement-batch
+    spec:
+      serviceAccountName: settlement-batch
+      containers:
+      - name: app
+        image: curlimages/curl:8.22.0
+        command: ["sleep", "infinity"]
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi

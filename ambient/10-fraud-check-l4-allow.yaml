@@ -1,0 +1,18 @@
+# L4 authorization in ambient mode, enforced by the ztunnel on the node of
+# each fraud-check pod: only payments-api's identity may open connections to
+# fraud-check. Identities, namespaces, IP blocks and ports are L4 attributes,
+# so ztunnel can enforce this without a waypoint.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: fraud-check-l4-allow
+  namespace: payments-ambient
+spec:
+  selector:
+    matchLabels:
+      app: fraud-check
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/payments-ambient/sa/payments-api"]

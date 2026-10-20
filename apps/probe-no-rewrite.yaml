@@ -1,0 +1,42 @@
+# A copy of risk-score whose pod opts out of Istio's probe rewrite. By
+# default the injector rewrites HTTP readiness/liveness probes so the kubelet
+# calls the sidecar agent (port 15020, /app-health/<container>/readyz), which
+# then calls the application locally. With the rewrite off, the kubelet sends
+# its probe straight to the application port, in plain text and without a
+# certificate, and the sidecar treats it like any other inbound connection.
+# The annotation only works on the pod (template), not on the Deployment.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ledger
+  namespace: payments
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ledger
+  template:
+    metadata:
+      labels:
+        app: ledger
+        version: v1
+      annotations:
+        sidecar.istio.io/rewriteAppHTTPProbers: "false"
+    spec:
+      serviceAccountName: risk-score
+      containers:
+      - name: fortio
+        image: fortio/fortio:1.75.3
+        args: ["server"]
+        ports:
+        - containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /debug
+            port: 8080
+          periodSeconds: 5
+          failureThreshold: 2
+        resources:
+          requests:
+            cpu: 10m
+            memory: 16Mi

@@ -1,0 +1,18 @@
+# Istio 1.31 control plane with the ambient profile: istiod + istio-cni + ztunnel.
+# The same control plane serves sidecar namespaces (istio-injection=enabled)
+# and ambient namespaces (istio.io/dataplane-mode=ambient). Ingress is a
+# Gateway API Gateway (gatewayClassName: istio), deployed on demand by istiod.
+# Nothing here sets mTLS: without a PeerAuthentication the mesh-wide mode is
+# PERMISSIVE, which is the starting point of the article.
+# Install with: istioctl install -y -f istio/install.yaml
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+metadata:
+  name: istio
+spec:
+  profile: ambient
+  meshConfig:
+    # Envoy access logs on stdout: response code, response flags and
+    # %RESPONSE_CODE_DETAILS% (e.g. rbac_access_denied_matched_policy[none],
+    # jwt_authn_access_denied{...}) come from here.
+    accessLogFile: /dev/stdout

@@ -1,0 +1,38 @@
+# A probe for one question: does TLS origination with mode SIMPLE and no
+# caCertificates verify the server certificate? istioctl analyze warns that
+# it does not (IST0129); the DestinationRule reference says the OS CA bundle
+# is used. The target is the lab's own HTTPS Gateway, whose certificate is
+# signed by the lab CA, which is not in the OS bundle: if the sidecar
+# verifies, the request fails; if it does not, it gets through.
+# Used by scripts/06-tls-edges.sh; not part of the payments setup.
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: api-payments-example
+  namespace: payments
+spec:
+  hosts:
+  - api.payments.example
+  location: MESH_EXTERNAL
+  ports:
+  - number: 80
+    name: http-port
+    protocol: HTTP
+    targetPort: 443
+  resolution: DNS
+  endpoints:
+  - address: payments-gateway-istio.payments-ingress.svc.cluster.local
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: api-payments-example
+  namespace: payments
+spec:
+  host: api.payments.example
+  trafficPolicy:
+    portLevelSettings:
+    - port:
+        number: 80
+      tls:
+        mode: SIMPLE

@@ -1,0 +1,15 @@
+# kind cluster for the lab: one control plane and two workers, so the
+# per-node ztunnel DaemonSet has more than one pod and callers and servers
+# land on different nodes (mTLS between nodes, not only inside one).
+# Default kind networking (kindnet), pods 10.244.0.0/16, Services 10.96.0.0/16.
+# Node image pinned by digest: the default of kind v0.32.0 (release notes).
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: istio-p3
+nodes:
+- role: control-plane
+  image: kindest/node:v1.36.1@sha256:3489c7674813ba5d8b1a9977baea8a6e553784dab7b84759d1014dbd78f7ebd5
+- role: worker
+  image: kindest/node:v1.36.1@sha256:3489c7674813ba5d8b1a9977baea8a6e553784dab7b84759d1014dbd78f7ebd5
+- role: worker
+  image: kindest/node:v1.36.1@sha256:3489c7674813ba5d8b1a9977baea8a6e553784dab7b84759d1014dbd78f7ebd5

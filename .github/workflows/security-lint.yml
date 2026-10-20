@@ -1,0 +1,38 @@
+# Offline security checks on every push and pull request. No cluster needed.
+# In your own repository, replace the test step with the set of manifests
+# you apply together, e.g.:
+#   bash ci/security-lint.sh deploy/payments/
+name: security-lint
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  security-lint:
+    runs-on: ubuntu-24.04
+    steps:
+      # actions/checkout v7.0.1, pinned to the commit SHA of the tag
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: Pinned istioctl, kubectl, yq and promtool into ./bin
+        run: bash tools/install-cli.sh
+      - name: security-lint test suite (working sets pass, silent errors fail)
+        run: bash ci/test-security-lint.sh
+      - name: security-lint on the hardened sidecar set (step 04 end state + edge)
+        run: >-
+          bash ci/security-lint.sh apps/payments-sidecar.yaml apps/legacy.yaml
+          mtls/peer-authentication-strict.yaml
+          authz/00-allow-nothing.yaml authz/10-fraud-check-allow.yaml authz/11-risk-score-allow.yaml
+          authz/12-payments-api-allow-ingress.yaml authz/20-fraud-check-deny-export.yaml
+          ingress/ jwt/ egress/
+      - name: Alert rules (promtool check + unit tests + mutants)
+        run: bash ci/test-alerts.sh
+      - name: JWT and TLS generators
+        run: bash ci/test-tools.sh
+      - name: Context guard (lab scripts refuse any context that is not a local kind cluster)
+        run: bash ci/test-context-guard.sh

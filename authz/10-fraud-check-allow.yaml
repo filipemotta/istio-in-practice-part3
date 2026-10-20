@@ -1,0 +1,23 @@
+# fraud-check accepts exactly one caller, payments-api, and only on its API:
+# GET/POST on /v1/check (port 8080) and /v1/score (port 8090, which
+# fraud-check forwards to risk-score). The principal is the SPIFFE identity
+# of the caller without the "spiffe://" prefix:
+# <trust domain>/ns/<namespace>/sa/<service account>.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: fraud-check-allow
+  namespace: payments
+spec:
+  selector:
+    matchLabels:
+      app: fraud-check
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/payments/sa/payments-api"]
+    to:
+    - operation:
+        methods: ["GET", "POST"]
+        paths: ["/v1/check", "/v1/check/*", "/v1/score", "/v1/score/*"]

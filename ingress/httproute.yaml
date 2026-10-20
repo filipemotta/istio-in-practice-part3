@@ -1,0 +1,22 @@
+# api.payments.example/v1/payments* -> payments-api. The route lives with the
+# service it exposes (namespace payments) and attaches to the Gateway in
+# payments-ingress, which admits routes from this namespace only. Without a
+# sectionName it attaches to every listener of the Gateway (HTTP and HTTPS).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: payments-api
+  namespace: payments
+spec:
+  parentRefs:
+  - name: payments-gateway
+    namespace: payments-ingress
+  hostnames: ["api.payments.example"]
+  rules:
+  - matches:
+    - path:
+        type: PathPrefix
+        value: /v1/payments
+    backendRefs:
+    - name: payments-api
+      port: 8080

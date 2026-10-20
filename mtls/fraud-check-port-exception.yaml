@@ -1,0 +1,19 @@
+# A temporary, scoped exception while settlement-batch is migrated: the
+# fraud-check workloads stay STRICT except on port 8090, where plain text is
+# still accepted. portLevelMtls only applies with a workload selector, and the
+# port is the port of the workload (the container), not of the Service.
+# A selector policy wins over the namespace-wide one for the pods it selects.
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: fraud-check-legacy-port
+  namespace: payments
+spec:
+  selector:
+    matchLabels:
+      app: fraud-check
+  mtls:
+    mode: STRICT
+  portLevelMtls:
+    8090:
+      mode: PERMISSIVE
