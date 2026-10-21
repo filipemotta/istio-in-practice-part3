@@ -12,7 +12,7 @@ metadata:
   namespace: payments
   annotations:
     exception.istio-in-practice/owner: team-payments
-    exception.istio-in-practice/expires: "2027-12-31"
+    exception.istio-in-practice/expires: "2027-06-30"
 spec:
   selector:
     matchLabels:

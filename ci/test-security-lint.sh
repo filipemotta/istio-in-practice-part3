@@ -103,6 +103,15 @@ expect_fail "the same override read from kubectl get -o yaml (kind: List, ci/tes
 expect_fail "port exception under STRICT with no owner or expiry date (ci/testdata)" \
   "port 8090 PERMISSIVE overrides the STRICT of payments/default for the pods it selects" \
   ${APPS} mtls/peer-authentication-strict.yaml ci/testdata/pa-port-exception-no-owner.yaml
+expect_fail "STRICT written with an empty selector is namespace-wide too (ci/testdata)" \
+  "mode PERMISSIVE overrides the STRICT of payments/default for the pods it selects" \
+  ${APPS} ci/testdata/pa-strict-empty-selector.yaml ci/testdata/pa-workload-permissive-override.yaml
+expect_fail "exception whose owner is only whitespace (ci/testdata)" \
+  "give the exception an owner and an expiry date" \
+  ${APPS} mtls/peer-authentication-strict.yaml ci/testdata/pa-port-exception-blank-owner.yaml
+expect_fail "exception expiring more than a year ahead (ci/testdata)" \
+  "more than 365 days from now: an exception is temporary" \
+  ${APPS} mtls/peer-authentication-strict.yaml ci/testdata/pa-port-exception-too-far.yaml
 expect_fail "port exception past its expiry date (ci/testdata)" \
   "exception expired on 2026-01-01 (owner team-payments): port 8090 PERMISSIVE still overrides the STRICT of payments/default" \
   ${APPS} mtls/peer-authentication-strict.yaml ci/testdata/pa-port-exception-expired.yaml

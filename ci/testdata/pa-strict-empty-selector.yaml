@@ -1,0 +1,12 @@
+# Namespace-wide STRICT written with an empty selector: Istio treats empty
+# matchLabels like no selector. Used by ci/test-security-lint.sh.
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: payments
+spec:
+  selector:
+    matchLabels: {}
+  mtls:
+    mode: STRICT

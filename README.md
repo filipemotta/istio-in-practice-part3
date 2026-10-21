@@ -475,13 +475,14 @@ A PERMISSIVE or DISABLE left in a PeerAuthentication with a selector, on the
 whole workload or on one port, overrides a namespace-wide or mesh-wide STRICT
 for the pods it selects, because Istio applies the narrowest matching policy.
 The lint fails on every such exception under STRICT unless it carries an owner
-and an expiry date, and fails again once the date has passed:
+and an expiry date at most a year ahead, and fails again once the date has
+passed:
 
 ```yaml
 metadata:
   annotations:
     exception.istio-in-practice/owner: team-payments
-    exception.istio-in-practice/expires: "2027-12-31"
+    exception.istio-in-practice/expires: "2027-06-30"
 ```
 
 `mtls/fraud-check-port-exception.yaml` carries both. Before switching a

@@ -29,8 +29,10 @@
 #       STRICT: the narrowest policy wins, so it quietly undoes STRICT for
 #       the pods it selects. Allowed only with an owner and an expiry date
 #       (annotations exception.istio-in-practice/owner and
-#       exception.istio-in-practice/expires: YYYY-MM-DD), and fails once the
-#       date has passed. Mesh-wide means no selector in istio-system;
+#       exception.istio-in-practice/expires: YYYY-MM-DD, at most 365 days
+#       ahead), and fails once the date has passed. Namespace-wide and
+#       mesh-wide mean no selector or empty matchLabels, as Istio reads it;
+#       mesh-wide is in istio-system;
 #     - ServiceEntry HTTP port sent to targetPort 443 without a
 #       DestinationRule that originates TLS for it: plain HTTP to a TLS port.
 # Not detectable offline: plain-text callers still in production traffic
@@ -100,6 +102,7 @@ findings="$(jq -r -s '
     any(ops[]; (keys - (keys - http_keys)) | length > 0)
     or any(sources[]; has("requestPrincipals") or has("notRequestPrincipals"))
     or any(rules[] | (.when // [])[]; .key | startswith("request."));
+  def ns_wide: ((.spec.selector.matchLabels // {}) | length) == 0;
   def selects($sel; $labels): ($sel | length) > 0 and ($sel | to_entries | all(.value == $labels[.key]));
   def targets: if .spec.targetRefs then [.spec.targetRefs[] | "\(.kind)/\(.name)"]
                elif .spec.selector then ["selector:\(.spec.selector.matchLabels | tojson)"]
@@ -159,9 +162,9 @@ findings="$(jq -r -s '
                   else empty end )
               else empty end )
         elif $d.kind == "PeerAuthentication" then
-          ( if $d.spec.selector == null then empty
+          ( if ($d | ns_wide) then empty
             else
-              [ $docs[] | select(.kind == "PeerAuthentication" and .spec.selector == null
+              [ $docs[] | select(.kind == "PeerAuthentication" and ns_wide
                                  and (.spec.mtls.mode // "") == "STRICT"
                                  and ((ns) == ($d | ns) or (ns) == "istio-system"))
                 | "\(ns)/\(.metadata.name)" ] as $strict
@@ -170,12 +173,14 @@ findings="$(jq -r -s '
                       | select((.value.mode // "") | IN("PERMISSIVE", "DISABLE")) | "port \(.key) \(.value.mode)" ] ) as $weak
               | if ($strict | length) == 0 or ($weak | length) == 0 then empty
                 else ($d.metadata.annotations // {}) as $a
-                  | ($a["exception.istio-in-practice/owner"] // "") as $owner
+                  | ($a["exception.istio-in-practice/owner"] // "" | gsub("^\\s+|\\s+$"; "")) as $owner
                   | ($a["exception.istio-in-practice/expires"] // "") as $exp
                   | if $owner == "" or ($exp | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$") | not) then
                       "\($file): \($d | id): \($weak | join(", ")) overrides the STRICT of \($strict | join(",")) for the pods it selects (the narrowest policy wins): give the exception an owner and an expiry date (annotations exception.istio-in-practice/owner and exception.istio-in-practice/expires: YYYY-MM-DD) or remove it"
                     elif (($exp + "T00:00:00Z") | fromdateiso8601) < now then
                       "\($file): \($d | id): exception expired on \($exp) (owner \($owner)): \($weak | join(", ")) still overrides the STRICT of \($strict | join(",")); remove it or renew the date"
+                    elif (($exp + "T00:00:00Z") | fromdateiso8601) > (now + 365 * 86400) then
+                      "\($file): \($d | id): exception expires on \($exp), more than 365 days from now: an exception is temporary, set a date within a year and renew it on purpose"
                     else empty end
                 end
             end ),

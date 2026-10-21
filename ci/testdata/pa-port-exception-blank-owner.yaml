@@ -1,0 +1,19 @@
+# The port exception with an owner or expiry date that does not hold anyone
+# to removing it. Used by ci/test-security-lint.sh.
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: fraud-check-legacy-port
+  namespace: payments
+  annotations:
+    exception.istio-in-practice/owner: "   "
+    exception.istio-in-practice/expires: "2027-01-31"
+spec:
+  selector:
+    matchLabels:
+      app: fraud-check
+  mtls:
+    mode: STRICT
+  portLevelMtls:
+    8090:
+      mode: PERMISSIVE
