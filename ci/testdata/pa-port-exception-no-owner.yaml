@@ -1,0 +1,17 @@
+# The port exception of mtls/fraud-check-port-exception.yaml without its owner
+# and expiry date: nobody is accountable for removing it.
+# Used by ci/test-security-lint.sh.
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: fraud-check-legacy-port
+  namespace: payments
+spec:
+  selector:
+    matchLabels:
+      app: fraud-check
+  mtls:
+    mode: STRICT
+  portLevelMtls:
+    8090:
+      mode: PERMISSIVE

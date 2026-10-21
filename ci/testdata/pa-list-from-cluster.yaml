@@ -1,0 +1,17 @@
+# What "kubectl get peerauthentication -A -o yaml" returns: a List. Here it
+# holds the leftover workload-level PERMISSIVE of
+# pa-workload-permissive-override.yaml. Used by ci/test-security-lint.sh.
+apiVersion: v1
+kind: List
+items:
+- apiVersion: security.istio.io/v1
+  kind: PeerAuthentication
+  metadata:
+    name: fraud-check-permissive
+    namespace: payments
+  spec:
+    selector:
+      matchLabels:
+        app: fraud-check
+    mtls:
+      mode: PERMISSIVE

@@ -24,10 +24,18 @@
 #     - PeerAuthentication portLevelMtls without a selector (rejected by the
 #       API server) or on a port that is not a container port of the
 #       selected workloads (e.g. the Service port): never applies;
+#     - PeerAuthentication with a selector that sets PERMISSIVE or DISABLE
+#       (workload-wide or on a port) under a namespace-wide or mesh-wide
+#       STRICT: the narrowest policy wins, so it quietly undoes STRICT for
+#       the pods it selects. Allowed only with an owner and an expiry date
+#       (annotations exception.istio-in-practice/owner and
+#       exception.istio-in-practice/expires: YYYY-MM-DD), and fails once the
+#       date has passed. Mesh-wide means no selector in istio-system;
 #     - ServiceEntry HTTP port sent to targetPort 443 without a
 #       DestinationRule that originates TLS for it: plain HTTP to a TLS port.
 # Not detectable offline: plain-text callers still in production traffic
 # (use mtls/plaintext-inventory.sh against the cluster before STRICT).
+# A "kind: List" (kubectl get ... -o yaml) is read item by item.
 # Analyze the whole set that is applied together: cross-resource checks only
 # see the files they are given. Exits 1 on any finding.
 set -uo pipefail
@@ -71,7 +79,7 @@ fi
 echo "== static security checks"
 docs=""
 for f in "${files[@]}"; do
-  if ! one="$(yq -o=json -I=0 '.' "${f}" | jq -c --arg file "${f}" 'select(. != null) | {file: $file, doc: .}')"; then
+  if ! one="$(yq -o=json -I=0 '.' "${f}" | jq -c --arg file "${f}" 'select(. != null) | if .kind == "List" then .items[] else . end | {file: $file, doc: .}')"; then
     echo "ERROR ${f}: not parseable as YAML"
     status=1
     continue
@@ -150,8 +158,29 @@ findings="$(jq -r -s '
                       else empty end
                   else empty end )
               else empty end )
-        elif $d.kind == "PeerAuthentication" and $d.spec.portLevelMtls != null then
-          if $d.spec.selector == null then
+        elif $d.kind == "PeerAuthentication" then
+          ( if $d.spec.selector == null then empty
+            else
+              [ $docs[] | select(.kind == "PeerAuthentication" and .spec.selector == null
+                                 and (.spec.mtls.mode // "") == "STRICT"
+                                 and ((ns) == ($d | ns) or (ns) == "istio-system"))
+                | "\(ns)/\(.metadata.name)" ] as $strict
+              | ( [ ($d.spec.mtls.mode // "") | select(IN("PERMISSIVE", "DISABLE")) | "mode \(.)" ]
+                  + [ ($d.spec.portLevelMtls // {}) | to_entries[]
+                      | select((.value.mode // "") | IN("PERMISSIVE", "DISABLE")) | "port \(.key) \(.value.mode)" ] ) as $weak
+              | if ($strict | length) == 0 or ($weak | length) == 0 then empty
+                else ($d.metadata.annotations // {}) as $a
+                  | ($a["exception.istio-in-practice/owner"] // "") as $owner
+                  | ($a["exception.istio-in-practice/expires"] // "") as $exp
+                  | if $owner == "" or ($exp | test("^[0-9]{4}-[0-9]{2}-[0-9]{2}$") | not) then
+                      "\($file): \($d | id): \($weak | join(", ")) overrides the STRICT of \($strict | join(",")) for the pods it selects (the narrowest policy wins): give the exception an owner and an expiry date (annotations exception.istio-in-practice/owner and exception.istio-in-practice/expires: YYYY-MM-DD) or remove it"
+                    elif (($exp + "T00:00:00Z") | fromdateiso8601) < now then
+                      "\($file): \($d | id): exception expired on \($exp) (owner \($owner)): \($weak | join(", ")) still overrides the STRICT of \($strict | join(",")); remove it or renew the date"
+                    else empty end
+                end
+            end ),
+          ( if $d.spec.portLevelMtls == null then empty
+          elif $d.spec.selector == null then
             "\($file): \($d | id): portLevelMtls without a selector (the API server rejects it: portLevelMtls requires selector)"
           else
             [ $docs[] | select(.kind == "Deployment" and (ns) == ($d | ns))
@@ -162,7 +191,7 @@ findings="$(jq -r -s '
                 | select(any($cports[]; . == $port) | not)
                 | "\($file): \($d | id): portLevelMtls port \($port) is not a container port of the selected workloads (\($cports | unique | join(","))): it matches the workload port, not the Service port, so it never applies"
               end
-          end
+          end )
         elif $d.kind == "ServiceEntry" then
           ($d.spec.hosts // [])[] as $h
           | ($d.spec.ports // [])[] | select(.targetPort == 443 and ((.protocol // "") | ascii_upcase) == "HTTP") | .number as $p

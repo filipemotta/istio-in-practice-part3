@@ -3,11 +3,16 @@
 # still accepted. portLevelMtls only applies with a workload selector, and the
 # port is the port of the workload (the container), not of the Service.
 # A selector policy wins over the namespace-wide one for the pods it selects.
+# ci/security-lint.sh accepts it only with an owner and an expiry date, and
+# fails once the date has passed: renew it on purpose or remove the exception.
 apiVersion: security.istio.io/v1
 kind: PeerAuthentication
 metadata:
   name: fraud-check-legacy-port
   namespace: payments
+  annotations:
+    exception.istio-in-practice/owner: team-payments
+    exception.istio-in-practice/expires: "2027-12-31"
 spec:
   selector:
     matchLabels:

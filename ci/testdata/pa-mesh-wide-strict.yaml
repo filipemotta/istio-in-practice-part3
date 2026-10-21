@@ -1,0 +1,10 @@
+# Mesh-wide STRICT: no selector in the root namespace (istio-system).
+# Used by ci/test-security-lint.sh.
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: default
+  namespace: istio-system
+spec:
+  mtls:
+    mode: STRICT

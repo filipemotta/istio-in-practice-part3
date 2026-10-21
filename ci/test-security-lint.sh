@@ -46,7 +46,8 @@ echo "== working sets must pass"
 # shellcheck disable=SC2086 # word splitting of the file lists is intended
 {
 expect_pass "workloads alone (sidecar, ambient, legacy)" ${APPS} ${AMBIENT}
-expect_pass "STRICT + port exception" ${APPS} mtls/peer-authentication-strict.yaml mtls/fraud-check-port-exception.yaml
+expect_pass "STRICT + port exception with an owner and an expiry date" ${APPS} mtls/peer-authentication-strict.yaml mtls/fraud-check-port-exception.yaml
+expect_pass "workload-level PERMISSIVE with no STRICT above it (nothing to override)" ${APPS} ci/testdata/pa-workload-permissive-override.yaml
 expect_pass "deny by default + the paths opened by name + DENY (step 04 end state)" \
   ${APPS} ingress/gateway.yaml mtls/peer-authentication-strict.yaml \
   authz/00-allow-nothing.yaml authz/10-fraud-check-allow.yaml authz/11-risk-score-allow.yaml \
@@ -90,6 +91,21 @@ expect_fail "DENY with only HTTP attributes and no port (ci/testdata)" \
 expect_fail "portLevelMtls without a selector (ci/testdata; the API server rejects it too)" \
   "portLevelMtls without a selector" \
   ${APPS} ci/testdata/pa-port-level-without-selector.yaml
+expect_fail "workload-level PERMISSIVE left under a namespace-wide STRICT (ci/testdata)" \
+  "mode PERMISSIVE overrides the STRICT of payments/default for the pods it selects" \
+  ${APPS} mtls/peer-authentication-strict.yaml ci/testdata/pa-workload-permissive-override.yaml
+expect_fail "workload-level PERMISSIVE under a mesh-wide STRICT (ci/testdata)" \
+  "mode PERMISSIVE overrides the STRICT of istio-system/default for the pods it selects" \
+  ${APPS} ci/testdata/pa-mesh-wide-strict.yaml ci/testdata/pa-workload-permissive-override.yaml
+expect_fail "the same override read from kubectl get -o yaml (kind: List, ci/testdata)" \
+  "mode PERMISSIVE overrides the STRICT of payments/default for the pods it selects" \
+  ${APPS} mtls/peer-authentication-strict.yaml ci/testdata/pa-list-from-cluster.yaml
+expect_fail "port exception under STRICT with no owner or expiry date (ci/testdata)" \
+  "port 8090 PERMISSIVE overrides the STRICT of payments/default for the pods it selects" \
+  ${APPS} mtls/peer-authentication-strict.yaml ci/testdata/pa-port-exception-no-owner.yaml
+expect_fail "port exception past its expiry date (ci/testdata)" \
+  "exception expired on 2026-01-01 (owner team-payments): port 8090 PERMISSIVE still overrides the STRICT of payments/default" \
+  ${APPS} mtls/peer-authentication-strict.yaml ci/testdata/pa-port-exception-expired.yaml
 expect_fail "ServiceEntry sending HTTP to 443 without the TLS-originating DestinationRule" \
   "port 80 of api.github.com is HTTP sent to targetPort 443 with no DestinationRule originating TLS" \
   egress/serviceentry-github.yaml

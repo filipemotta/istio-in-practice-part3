@@ -449,8 +449,9 @@ message.
 Related mistakes the lint also catches, which are not silent: an L4 policy
 naming the original caller once a waypoint is in the path (503 through the
 waypoint, step 07), a DENY rule with HTTP attributes and no port (istiod
-warns), `portLevelMtls` without a selector (the API server rejects it), and a
-ServiceEntry that sends plain HTTP to port 443 without the TLS-originating
+warns), `portLevelMtls` without a selector (the API server rejects it), a
+workload-level or port-level PERMISSIVE under STRICT with no owner or past its
+expiry date, and a ServiceEntry that sends plain HTTP to port 443 without the TLS-originating
 DestinationRule (503 UC, step 06).
 
 ## Security checks in CI (no cluster)
@@ -469,6 +470,24 @@ bash ci/security-lint.sh apps/payments-sidecar.yaml apps/legacy.yaml \
   authz/12-payments-api-allow-ingress.yaml authz/20-fraud-check-deny-export.yaml \
   ingress/ jwt/ egress/
 ```
+
+A PERMISSIVE or DISABLE left in a PeerAuthentication with a selector, on the
+whole workload or on one port, overrides a namespace-wide or mesh-wide STRICT
+for the pods it selects, because Istio applies the narrowest matching policy.
+The lint fails on every such exception under STRICT unless it carries an owner
+and an expiry date, and fails again once the date has passed:
+
+```yaml
+metadata:
+  annotations:
+    exception.istio-in-practice/owner: team-payments
+    exception.istio-in-practice/expires: "2027-12-31"
+```
+
+`mtls/fraud-check-port-exception.yaml` carries both. Before switching a
+namespace to STRICT, lint it together with the selector policies already in
+the cluster (`kubectl get peerauthentication -A -o yaml`), since an old one is
+exactly what this check is for.
 
 `ci/test-security-lint.sh` proves the lint both ways: the working sets of the
 lab pass, and each silent error fails with its own message. One mistake is not

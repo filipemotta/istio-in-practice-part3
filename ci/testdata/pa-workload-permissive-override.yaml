@@ -1,0 +1,15 @@
+# Silent error: a leftover workload-level PERMISSIVE, from before the
+# namespace moved to STRICT. The narrowest policy wins, so fraud-check keeps
+# accepting plain text while the namespace-wide policy says STRICT.
+# Used by ci/test-security-lint.sh.
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: fraud-check-permissive
+  namespace: payments
+spec:
+  selector:
+    matchLabels:
+      app: fraud-check
+  mtls:
+    mode: PERMISSIVE
